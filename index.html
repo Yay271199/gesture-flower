@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F7F2E8">
+<title>指尖花开</title>
+<style>
+  :root{
+    --cream:#F7F2E8;
+    --cream-2:#F2EADD;
+    --ink:#3B3630;
+    --ink-soft:#8B8279;
+    --line:rgba(59,54,48,.14);
+    --rose:#C97C8E;
+    --card:rgba(255,255,255,.74);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden}
+  body{
+    background:radial-gradient(120% 80% at 50% 22%, #FCF8F0 0%, var(--cream) 45%, var(--cream-2) 100%);
+    color:var(--ink);
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    user-select:none;
+  }
+  #flower{position:fixed;left:0;top:0;width:100%;height:50%}
+
+  #camera{
+    position:fixed;left:0;top:50%;width:100%;height:50%;
+    background:#161311;overflow:hidden;
+    border-top:1px solid rgba(59,54,48,.16);
+    box-shadow:inset 0 14px 28px rgba(0,0,0,.22);
+  }
+  #camera video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block}
+  #handview{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+  #camera .fade{
+    position:absolute;left:0;top:0;width:100%;height:64px;pointer-events:none;
+    background:linear-gradient(to bottom, rgba(247,242,232,.92), rgba(247,242,232,0));
+  }
+  #camLabel{
+    position:absolute;left:14px;top:14px;padding:5px 11px;border-radius:999px;
+    font-size:11px;letter-spacing:.08em;color:#F7F2E8;background:rgba(0,0,0,.34);
+    backdrop-filter:blur(6px);
+  }
+  #gestureChip{
+    position:absolute;right:14px;top:14px;padding:5px 11px;border-radius:999px;
+    font-size:11px;color:#F7F2E8;background:rgba(0,0,0,.34);backdrop-filter:blur(6px);
+  }
+  #dbginfo{
+    position:absolute;right:14px;top:44px;max-width:72%;text-align:right;line-height:1.5;
+    font-size:10px;color:rgba(255,255,255,.68);white-space:pre-line;
+    font-family:ui-monospace,Consolas,monospace;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.5);
+  }
+  #camHint{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    text-align:center;color:rgba(255,255,255,.88);font-size:13px;line-height:1.9;
+    pointer-events:none;text-shadow:0 1px 8px rgba(0,0,0,.55);width:86%;
+  }
+  #camHint .ring{
+    width:120px;height:120px;margin:0 auto 12px;border-radius:50%;
+    border:1.5px solid rgba(255,255,255,.55);
+    display:grid;place-items:center;font-size:12px;color:#fff;
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,.22)}
+    50%{transform:scale(1.06);box-shadow:0 0 0 18px rgba(255,255,255,0)}
+  }
+
+  #name{
+    position:fixed;left:50%;top:calc(max(12px,env(safe-area-inset-top)) + 26px);transform:translateX(-50%);
+    font-size:12px;letter-spacing:.22em;color:var(--ink-soft);pointer-events:none;text-align:center;
+  }
+  #name b{font-weight:600;letter-spacing:.22em}
+  #name .dots{display:block;margin-top:6px;letter-spacing:0}
+  #name .dot{
+    display:inline-block;width:5px;height:5px;border-radius:50%;margin:0 3px;
+    background:rgba(59,54,48,.18);vertical-align:middle;transition:background .2s,transform .2s;
+  }
+  #name .dot.on{background:var(--rose);transform:scale(1.35)}
+
+  #ctrl{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-100%);
+    display:flex;align-items:center;gap:8px;padding:7px;
+    border-radius:999px;background:var(--card);border:1px solid var(--line);
+    backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(90,70,50,.14);
+    max-width:calc(100% - 24px);
+  }
+  button{
+    appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:999px;padding:8px 14px;font-size:12px;cursor:pointer;
+    white-space:nowrap;transition:transform .12s,background .15s,color .15s;
+  }
+  button:active{transform:scale(.96)}
+  button:disabled{opacity:.55;cursor:default}
+  button[data-on="1"]{background:var(--rose);border-color:var(--rose);color:#fff}
+  #slider{width:96px;accent-color:var(--rose);display:none}
+  #slider.show{display:block}
+
+  #topbar{
+    position:fixed;left:50%;top:max(12px,env(safe-area-inset-top));transform:translateX(-50%);
+    font-size:12px;color:var(--ink-soft);letter-spacing:.06em;pointer-events:none;
+    text-align:center;width:92%;
+  }
+  #toast{
+    position:fixed;left:50%;top:16%;transform:translate(-50%,-8px);
+    padding:8px 16px;border-radius:999px;background:rgba(59,54,48,.82);color:#FBF7EF;
+    font-size:13px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #loading{
+    position:fixed;left:50%;top:25%;transform:translate(-50%,-50%);
+    font-size:12px;color:var(--ink-soft);letter-spacing:.1em;
+    pointer-events:none;
+  }
+
+  @media (max-width:640px){
+    #name{top:calc(max(12px,env(safe-area-inset-top)) + 24px);font-size:11px}
+    button{padding:7px 11px;font-size:11px}
+    #slider{width:70px}
+    #ctrl{gap:6px;padding:6px}
+    #camHint{font-size:12px}
+    #camHint .ring{width:100px;height:100px}
+    #topbar{font-size:11px}
+  }
+</style>
+</head>
+<body>
+<canvas id="flower"></canvas>
+<div id="name"><b>白鸡蛋花</b><span class="dots"><i class="dot on"></i><i class="dot"></i><i class="dot"></i></span></div>
+<div id="topbar">五指张开 = 花开 · 握拳 = 花合 · 左右挥动 = 换花 · 不准先点「校准手势」</div>
+<div id="loading">加载花开画面 0/69</div>
+
+<div id="camera">
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="handview"></canvas>
+  <div class="fade"></div>
+  <div id="camLabel">手势识别 · v8</div>
+  <div id="gestureChip">未开启</div>
+  <div id="dbginfo"></div>
+  <div id="camHint">
+    <div class="ring">把手举到这里</div>
+    点下方「开启摄像头」并允许权限<br>手掌正对镜头、离镜头约一臂，五指分开
+  </div>
+</div>
+
+<div id="ctrl">
+  <button id="btnCam">开启摄像头</button>
+  <button id="btnCal">校准手势</button>
+  <button id="btnDemo">演示模式</button>
+  <input id="slider" type="range" min="0" max="1" step="0.01" value="0">
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============ 三朵花：每个视频一套帧图 ============ */
+const FLOWERS = [
+  {name:'白鸡蛋花', dir:'frames_l',  count:48, fit:[0.76, 0.80], fade:0.17, lift:0.46},
+  {name:'蓝白樱花', dir:'frames2_l', count:48, fit:[0.82, 0.86], fade:0.16, lift:0.47},
+  {name:'粉芍药',   dir:'frames3_l', count:48, fit:[0.94, 0.78], fade:0.10, lift:0.50},
+];
+const flowers = FLOWERS.map(f => ({ ...f, imgs: [], loaded: 0, started: false }));
+const loadingEl = document.getElementById('loading');
+let cur = 0, prevFlower = -1, mixUntil = 0;
+
+function loadFlower(i, quiet){
+  const fl = flowers[i];
+  if (fl.started) return;
+  fl.started = true;
+  fl.imgs = new Array(fl.count);
+  /* 先每 6 帧取一张，几秒内就能看到完整花朵轮廓；剩下的帧再补齐，避免干等 */
+  const order = [0];
+  for (let k = 6; k < fl.count; k += 6) order.push(k);
+  for (let k = 1; k < fl.count; k++) if (!order.includes(k)) order.push(k);
+  for (const idx of order){
+    const n = idx + 1;
+    const img = new Image();
+    img.src = fl.dir + '/frame_' + String(n).padStart(4, '0') + '.webp';
+    img.onload = img.onerror = () => {
+      if (fl.imgs[n - 1] !== img) return;   // 这一套已经被释放/重载了，忽略旧回调
+      fl.loaded++;
+      if (i === cur){
+        loadingEl.textContent = '加载花开画面 ' + fl.loaded + '/' + fl.count;
+        if (fl.loaded === fl.count) loadingEl.style.display = 'none';
+      }
+      if (fl.loaded === fl.count && i !== cur && !quiet) toast('「' + fl.name + '」已就绪');
+    };
+    fl.imgs[n - 1] = img;
+  }
+}
+loadFlower(0);
+
+/* ============ 画布 ============ */
+const stage = document.getElementById('flower');
+const ctx = stage.getContext('2d');
+const video = document.getElementById('video');
+const nameEl = document.getElementById('name');
+const gChip = document.getElementById('gestureChip');
+const dbgEl = document.getElementById('dbginfo');
+const camHint = document.getElementById('camHint');
+const slider = document.getElementById('slider');
+const toastEl = document.getElementById('toast');
+const handview = document.getElementById('handview');
+const octx = handview.getContext('2d');
+
+let cw = 0, ch = 0, dpr = 1;
+function fit(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cw = stage.clientWidth; ch = stage.clientHeight;
+  stage.width = Math.round(cw * dpr);
+  stage.height = Math.round(ch * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', fit);
+addEventListener('orientationchange', () => setTimeout(fit, 300));
+addEventListener('load', () => { fit(); setTimeout(fit, 200); });
+if (window.visualViewport) visualViewport.addEventListener('resize', fit);
+fit();
+
+/* 双击 html（file://）时浏览器会拦截本地模型，先明确提示，免得误以为是摄像头或手势坏了 */
+if (location.protocol === 'file:'){
+  camHint.style.display = 'block';
+  camHint.innerHTML = '<div class="ring">需要本地服务</div>'
+    + '当前是双击打开（file://）<br>'
+    + '<span style="font-size:11px;opacity:.9">浏览器会拦截手势识别模型</span><br>'
+    + '<span style="font-size:11px;opacity:.9">请运行「启动.bat」，用 http://localhost:8123 打开</span>';
+  setGesture('请用本地服务打开');
+  dbgEl.textContent = '协议 file:// · 模型无法加载\n请运行 启动.bat';
+}
+
+let open = 0, target = 0, desired = 0;
+let demoMode = false, camOn = false;
+let holding = false, holdUntil = 0, holdArmed = true;
+let lastT = performance.now();
+
+/* ============ 绘制：浮空的花（支持换花淡入淡出） ============ */
+/* 按开合度取帧；如果目标帧还没下载完，就用最近的已加载帧，保证过渡时画面不消失 */
+function frameAt(fl, openness){
+  const n = fl.count;
+  const idx = Math.min(n - 1, Math.round(openness * (n - 1)));
+  const ok = j => fl.imgs[j] && fl.imgs[j].complete && fl.imgs[j].naturalWidth > 0;
+  if (ok(idx)) return fl.imgs[idx];
+  for (let d = 1; d < n; d++){
+    for (const j of [idx - d, idx + d]){
+      if (j >= 0 && j < n && ok(j)) return fl.imgs[j];
+    }
+  }
+  return null;
+}
+function drawOne(fl, openness, alpha, t){
+  if (alpha <= 0.01) return;
+  const f = frameAt(fl, openness);
+  if (!f) return;
+
+  const bob = Math.sin(t / 2600) * ch * 0.020;
+  const sway = Math.sin(t / 3900) * cw * 0.006;
+  const cx = cw * 0.5 + sway;
+  const cy = ch * (fl.lift || 0.46) + bob;
+  const s = Math.min((cw * fl.fit[0]) / f.naturalWidth, (ch * fl.fit[1]) / f.naturalHeight);
+  const dw = f.naturalWidth * s;
+  const dh = f.naturalHeight * s;
+  const rot = Math.sin(t / 4200) * 0.008;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // 悬浮投影
+  const shY = cy + dh * 0.40;
+  const g = ctx.createRadialGradient(cx, shY, 0, cx, shY, dw * 0.46);
+  g.addColorStop(0, 'rgba(146,126,104,0.15)');
+  g.addColorStop(0.55, 'rgba(146,126,104,0.07)');
+  g.addColorStop(1, 'rgba(146,126,104,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(cx, shY, dw * 0.34, dh * 0.055, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 花本体
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+  ctx.drawImage(f, -dw / 2, -dh / 2, dw, dh);
+  ctx.restore();
+
+  // 底部渐隐（每朵花不同：芍药几乎没有花茎，只做很弱的一层）
+  const fadeH = fl.fade || 0;
+  if (fadeH > 0.02){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = 'destination-out';
+    const bh = dh * fadeH;
+    const grad = ctx.createLinearGradient(0, cy + dh / 2 - bh, 0, cy + dh / 2);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - dw / 2, cy + dh / 2 - bh, dw, bh);
+    ctx.restore();
+  }
+}
+
+function drawFrame(t){
+  ctx.clearRect(0, 0, cw, ch);
+  if (prevFlower >= 0){
+    const total = 420;
+    const e = Math.max(0, (mixUntil - performance.now()) / total);   // 1 → 0
+    if (e <= 0){
+      prevFlower = -1;
+    }else{
+      drawOne(flowers[prevFlower], open, Math.max(0, Math.min(1, (e - 0.45) / 0.55)), t);
+    }
+  }
+  let inA = 1;
+  if (prevFlower >= 0){
+    const total = 420;
+    const e = Math.max(0, (mixUntil - performance.now()) / total);
+    inA = Math.max(0, Math.min(1, (0.55 - e) / 0.55));
+  }
+  drawOne(flowers[cur], open, inA, t);
+}
+
+/* ============ 主循环 ============ */
+function loop(t){
+  const dt = Math.min(t - lastT, 60);
+  lastT = t;
+  const now = performance.now();
+
+  if (!holding && holdArmed && !cal.active && open > 0.96){
+    holding = true; holdUntil = now + 2000; holdArmed = false;
+  }
+  if (holding && now >= holdUntil) holding = false;
+  if (open < 0.60) holdArmed = true;
+  target = holding ? 1 : desired;
+  if (holding && !cal.active) setGesture('盛开 · 停顿 2 秒');
+
+  const k = 1 - Math.exp(-dt / 110);
+  open += (target - open) * k;
+  if (Math.abs(target - open) < 0.002) open = target;
+
+  drawFrame(t);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ============ 提示 ============ */
+let toastTimer = null;
+function toast(text){
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1400);
+}
+function setGesture(text){ gChip.textContent = text; }
+
+function syncName(){
+  const dots = flowers.map((_, i) => '<i class="dot' + (i === cur ? ' on' : '') + '"></i>').join('');
+  nameEl.innerHTML = '<b>' + flowers[cur].name + '</b><span class="dots">' + dots + '</span>';
+}
+
+/* 换花：dir=+1 下一朵 / -1 上一朵 */
+let switching = false;
+function switchFlower(dir){
+  if (switching) return;
+  switching = true;
+  const next = (cur + dir + flowers.length) % flowers.length;
+  prevFlower = cur;
+  cur = next;
+  mixUntil = performance.now() + 420;
+  loadFlower(cur);
+  syncName();
+  if (flowers[cur].loaded < flowers[cur].count){
+    loadingEl.style.display = 'block';
+    loadingEl.textContent = '加载' + flowers[cur].name + ' ' + flowers[cur].loaded + '/' + flowers[cur].count;
+    toast('正在载入「' + flowers[cur].name + '」…');
+  }else{
+    loadingEl.style.display = 'none';
+    toast('换花 · ' + flowers[cur].name + '（' + (cur + 1) + '/' + flowers.length + '）');
+  }
+  setTimeout(() => { switching = false; }, 450);
+  setTimeout(releaseOthers, 800);
+}
+syncName();
+
+/* 只保留「当前这朵 + 下一朵」两套帧图，手机内存更稳；换过的花再回来会重新载入 */
+function releaseOthers(){
+  const keepNext = (cur + 1) % flowers.length;
+  flowers.forEach((fl, i) => {
+    if (i === cur || i === keepNext) return;
+    fl.started = false; fl.loaded = 0; fl.imgs = [];
+  });
+  const nx = flowers[keepNext];
+  if (nx.started) return;
+  const chk = setInterval(() => {
+    if (flowers[cur].loaded >= flowers[cur].count){
+      clearInterval(chk);
+      loadFlower(keepNext, true);
+    }
+  }, 300);
+}
+setTimeout(() => { if (flowers[0].loaded >= flowers[0].count) loadFlower(1, true); }, 1200);
+
+/* ============ 摄像头 + 手势识别（@mediapipe/tasks-vision，模型全部本地） ============ */
+let handTracker = null;
+
+/* r = 五指尖到腕点距离的平均 / 掌宽（腕点→中指根）。
+   2D 版本经过实测标定：握拳 ≈1.3~1.5，五指张开 ≈2.1~2.5。 */
+function handOpenness(lm){
+  const ar = (video.videoWidth || 640) / (video.videoHeight || 480);
+  const dist = (a, b) => Math.hypot((a.x - b.x) * ar, a.y - b.y);
+  const palm = dist(lm[0], lm[9]) || 1e-6;
+  const tips = [4, 8, 12, 16, 20];
+  return tips.reduce((s, i) => s + dist(lm[i], lm[0]) / palm, 0) / tips.length;
+}
+
+/* r 的锚点只由「校准」写入，平时不再自动扩张，避免一次抖动把手张开的上限顶高 */
+let rLo = 1.38, rHi = 1.95;
+function calibrate(raw){
+  const span = Math.max(0.45, rHi - rLo);
+  // 只用 90% 的量程就映射到全开，留出余量，手指张到最大时花能真正开满
+  return Math.max(0, Math.min(1, (raw - rLo) / (span * 0.90)));
+}
+
+/* 一键校准：把你自己的「握拳 / 张开」两个读数存下来，换手型、换距离都适用 */
+/* 版本升级换 key：旧版把「张开上限」越抖越高，旧数据会让花永远开不满，直接作废重标 */
+const CAL_KEY = 'gfCalV2';
+function loadCal(){
+  try{
+    const s = JSON.parse(localStorage.getItem(CAL_KEY) || 'null');
+    if (s && Number.isFinite(s.lo) && Number.isFinite(s.hi) && s.hi - s.lo >= 0.45){
+      rLo = Math.max(0.90, Math.min(2.20, s.lo));
+      rHi = Math.max(rLo + 0.45, Math.min(3.00, s.hi));
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+loadCal();
+
+const cal = { active:false, phase:'', t0:0, samples:[], fist:0, lastHand:0 };
+let calPending = false;
+const CAL_MS = 1800, CAL_MIN = 14;
+function mid(a){
+  const s = [...a].sort((x, y) => x - y);
+  return s[Math.floor(s.length / 2)];
+}
+function startCal(){
+  if (cal.active || !camOn || !handTracker) return;
+  demoMode = false;
+  document.getElementById('btnDemo').dataset.on = '0';
+  slider.classList.remove('show');
+  holding = false; desired = open;
+  cal.active = true; cal.phase = 'fist'; cal.t0 = performance.now();
+  cal.samples = []; cal.fist = 0; cal.lastHand = performance.now();
+  const b = document.getElementById('btnCal');
+  b.textContent = '校准中…'; b.dataset.on = '1'; b.disabled = true;
+  setGesture('校准 · 请握拳');
+  toast('第 1 步：握拳，保持 1.8 秒');
+}
+function stopCal(msg, ok){
+  cal.active = false;
+  const b = document.getElementById('btnCal');
+  b.textContent = ok ? '重新校准' : '校准手势';
+  b.dataset.on = ok ? '1' : '0';
+  b.disabled = false;
+  setGesture(ok ? '校准完成 · 试试手势' : (camOn ? '寻找手…' : '未开启'));
+  if (msg) toast(msg);
+}
+function calTick(raw0, now){
+  if (now - cal.lastHand > 4000){
+    stopCal('校准中断：4 秒没识别到手，把手放进虚线框后重新校准', false);
+    return;
+  }
+  cal.samples.push(raw0);
+  if (now - cal.t0 < CAL_MS) return;
+  if (cal.samples.length < CAL_MIN){
+    stopCal('校准没采到足够数据，把手放正、离镜头一臂再试', false);
+    return;
+  }
+  const v = mid(cal.samples);
+  if (cal.phase === 'fist'){
+    cal.fist = v; cal.phase = 'open'; cal.t0 = now; cal.samples = [];
+    setGesture('校准 · 请张开');
+    toast('第 2 步：五指张开，保持 1.8 秒');
+    return;
+  }
+  if (v - cal.fist < 0.45){
+    stopCal('握拳和张开差别太小（' + cal.fist.toFixed(2) + ' / ' + v.toFixed(2) + '），握紧一点、张开时手指再分开些', false);
+    return;
+  }
+  rLo = cal.fist; rHi = v;
+  openHist = []; openSmooth = 0.5; desired = open;
+  try{ localStorage.setItem(CAL_KEY, JSON.stringify({ lo: rLo, hi: rHi, at: Date.now() })); }catch(e){}
+  stopCal('校准完成：握拳 ' + rLo.toFixed(2) + ' / 张开 ' + rHi.toFixed(2) + '（已记住）', true);
+}
+
+let modelState = 'idle';
+let modelDelegate = '';
+let lastHandAt = 0;
+
+async function camErrorText(err){
+  const n = (err && err.name) || '';
+  let base;
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    base = '权限被拒绝：在浏览器弹窗里点「允许」；或打开 设置 → 隐私和安全性 → 摄像头，允许浏览器访问';
+  else if (n === 'NotFoundError' || n === 'DevicesNotFoundError') base = '没找到摄像头设备';
+  else if (n === 'NotReadableError' || n === 'TrackStartError')
+    base = '摄像头被其它程序占用（微信 / QQ / 钉钉 / 其它浏览器），关掉它们再点一次';
+  else if (n === 'OverconstrainedError') base = '摄像头不支持所请求的分辨率';
+  else base = (n ? n + '：' : '') + ((err && err.message) || '未知错误');
+
+  let count = '';
+  try{
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const vids = devs.filter(d => d.kind === 'videoinput').length;
+    count = vids ? '（系统检测到 ' + vids + ' 个摄像头）' : '（系统里没有检测到摄像头设备）';
+  }catch(e){}
+  return base + count;
+}
+
+async function startCamera(){
+  const btn = document.getElementById('btnCam');
+  const modelTask = handTracker ? Promise.resolve() : initHands();
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setGesture('摄像头打不开');
+    camHint.style.display = 'block';
+    camHint.innerHTML = '浏览器不支持调用摄像头<br><span style="font-size:11px;opacity:.85">'
+      + '请用 http://localhost:8123 打开页面（不要直接双击 html 文件）</span>';
+    return;
+  }
+
+  const tries = [
+    { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false },
+    { video: { facingMode: 'user' }, audio: false },
+    { video: true, audio: false },
+  ];
+  let stream = null, lastErr = null;
+  for (const c of tries){
+    try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }
+    catch(e){ lastErr = e; console.warn('摄像头尝试失败', c, e); }
+  }
+
+  try{
+    if (!stream) throw lastErr || new Error('无可用摄像头');
+    video.srcObject = stream;
+    camOn = true;   // 拿到流就算已开，播放被拦截也不影响识别
+    video.play().catch(e => console.warn('预览播放被拦截', e));
+    camHint.style.display = 'none';
+    btn.dataset.on = '1';
+    btn.textContent = '摄像头已开';
+    if (!handTracker) setGesture('模型加载中…');
+    await modelTask;
+    if (camOn && handTracker) setGesture('模型已就绪 · 把手放进框');
+    if (calPending && handTracker){
+      calPending = false;
+      toast('摄像头已开，开始校准');
+      setTimeout(startCal, 400);
+    }
+  }catch(err){
+    console.error(err);
+    calPending = false;
+    setGesture('摄像头打不开');
+    camHint.style.display = 'block';
+    const why = await camErrorText(err);
+    camHint.innerHTML = '摄像头打不开<br><span style="font-size:11px;opacity:.85">' + why
+      + '</span><br><span style="font-size:11px;opacity:.7">处理好后，再点一次「开启摄像头」</span>';
+  }
+}
+
+async function initHands(){
+  modelState = 'loading';
+  let vision;
+  try{
+    vision = await import('./mp/vision_bundle.js');
+  }catch(err){
+    console.error(err);
+    modelState = 'fail';
+    setGesture('识别库加载失败');
+    dbgEl.textContent = '识别库加载失败\n' + ((err && err.message) || err);
+    camHint.style.display = 'block';
+    camHint.innerHTML = '识别库没加载成功<br><span style="font-size:11px;opacity:.8">'
+      + (location.protocol === 'file:' ? '当前是 file:// 打开，请改用「启动.bat」的 http://localhost:8123' : '检查 mp 文件夹是否完整')
+      + '</span>';
+    return;
+  }
+  let fileset;
+  try{
+    fileset = await vision.FilesetResolver.forVisionTasks('./mp/wasm');
+  }catch(err){
+    console.error(err);
+    modelState = 'fail';
+    setGesture('wasm 加载失败');
+    dbgEl.textContent = 'wasm 加载失败\n' + ((err && err.message) || err);
+    camHint.style.display = 'block';
+    camHint.innerHTML = '识别引擎没加载成功<br><span style="font-size:11px;opacity:.8">检查 mp/wasm 文件夹是否完整</span>';
+    return;
+  }
+  const common = {
+    runningMode: 'VIDEO',
+    numHands: 1,
+    minHandDetectionConfidence: 0.35,
+    minHandPresenceConfidence: 0.35,
+    minTrackingConfidence: 0.30,
+  };
+  const fails = [];
+  for (const delegate of ['GPU', 'CPU']){
+    try{
+      handTracker = await vision.HandLandmarker.createFromOptions(fileset, {
+        ...common,
+        baseOptions: { modelAssetPath: './mp/hand_landmarker.task', delegate },
+      });
+      modelDelegate = delegate;
+      break;
+    }catch(err){
+      console.warn('delegate ' + delegate + ' 初始化失败', err);
+      fails.push(delegate + ' ' + ((err && err.name) || '') + ': ' + ((err && err.message) || err));
+    }
+  }
+  if (!handTracker){
+    modelState = 'fail';
+    setGesture('模型初始化失败');
+    dbgEl.textContent = '模型初始化失败\n' + fails.join('\n').slice(0, 340);
+    camHint.style.display = 'block';
+    camHint.innerHTML = '手势模型没能启动<br><span style="font-size:11px;opacity:.8">刷新页面，或用最新版 Chrome / Edge</span>';
+    return;
+  }
+  modelState = 'ready';
+  setGesture(camOn ? '模型已就绪' : '模型已就绪 · 摄像头未开');
+  dbgEl.textContent = '模型已就绪（' + modelDelegate + '）';
+  detectLoop();
+  if (calPending && camOn){
+    calPending = false;
+    toast('模型已就绪，开始校准');
+    setTimeout(startCal, 300);
+  }
+}
+
+/* 手部骨架小窗：能直观看到“有没有认到手、手在不在画面的框里” */
+const CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+              [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const TIPS = [4, 8, 12, 16, 20];
+
+function sizeOverlay(){
+  const w = Math.round(handview.clientWidth * dpr);
+  const h = Math.round(handview.clientHeight * dpr);
+  if (handview.width !== w || handview.height !== h){ handview.width = w; handview.height = h; }
+}
+function drawOverlay(lm, k){
+  sizeOverlay();
+  const W = handview.clientWidth, H = handview.clientHeight;
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  octx.clearRect(0, 0, W, H);
+  // 对准框
+  octx.save();
+  octx.setLineDash([10, 12]);
+  octx.lineWidth = 1.6;
+  octx.strokeStyle = 'rgba(255,255,255,.34)';
+  const bx = W * 0.16, by = H * 0.10, bw = W * 0.68, bh = H * 0.82;
+  octx.strokeRect(bx, by, bw, bh);
+  octx.restore();
+  if (!lm) return;
+  // 预览是 object-fit:cover + 水平镜像，骨架按同样的映射叠上去
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  const sc = Math.max(W / vw, H / vh);
+  const ox = (W - vw * sc) / 2, oy = (H - vh * sc) / 2;
+  const X = p => (1 - p.x) * vw * sc + ox;
+  const Y = p => p.y * vh * sc + oy;
+  octx.save();
+  octx.lineWidth = 2.2;
+  octx.strokeStyle = 'rgba(201,124,142,.95)';
+  octx.lineCap = 'round';
+  for (const [a, b] of CONN){
+    octx.beginPath();
+    octx.moveTo(X(lm[a]), Y(lm[a]));
+    octx.lineTo(X(lm[b]), Y(lm[b]));
+    octx.stroke();
+  }
+  for (let i = 0; i < 21; i++){
+    const tip = TIPS.includes(i);
+    octx.beginPath();
+    octx.arc(X(lm[i]), Y(lm[i]), tip ? 4.2 : 2.8, 0, Math.PI * 2);
+    octx.fillStyle = tip ? 'rgba(255,255,255,.95)' : 'rgba(255,224,214,.92)';
+    octx.fill();
+  }
+  // 开合度竖条
+  const barH = H * 0.34, barW = 7;
+  const bxx = W - barW - 14, byy = H * 0.55 - barH / 2;
+  octx.globalAlpha = .55;
+  octx.fillStyle = 'rgba(255,255,255,.35)';
+  octx.fillRect(bxx, byy, barW, barH);
+  octx.fillStyle = 'rgba(201,124,142,.95)';
+  const kk = Math.min(1, Math.max(0, k));
+  octx.fillRect(bxx, byy + barH * (1 - kk), barW, barH * kk);
+  octx.restore();
+}
+
+/* 挥手换花：手腕在小窗里左右扫动，2 次反向摆动触发 */
+let palmHist = [];
+let lastWave = 0;
+function checkWave(px, now){
+  palmHist.push({ t: now, x: px });
+  while (palmHist.length && now - palmHist[0].t > 900) palmHist.shift();
+  if (palmHist.length < 3 || now - lastWave < 1100) return;
+  let mn = palmHist[0], mx = palmHist[0];
+  for (const p of palmHist){
+    if (p.x < mn.x) mn = p;
+    if (p.x > mx.x) mx = p;
+  }
+  if (mx.x - mn.x < 0.24) return;
+  // 至少一次方向反转（左右来回）
+  const order = [...palmHist].sort((a, b) => a.t - b.t);
+  let dirs = [];
+  for (let i = 1; i < order.length; i++){
+    const d = order[i].x - order[i - 1].x;
+    if (Math.abs(d) < 0.008) continue;
+    dirs.push(Math.sign(d));
+  }
+  let rev = 0;
+  for (let i = 1; i < dirs.length; i++) if (dirs[i] !== dirs[i - 1]) rev++;
+  if (rev < 1) return;
+  lastWave = now;
+  palmHist = [];
+  // 预览是镜像的：原始画面里 x 变小，在用户眼里才是向右 → 下一朵
+  const lastDir = dirs[dirs.length - 1] || 1;
+  switchFlower(lastDir < 0 ? 1 : -1);
+}
+
+let openHist = [], openSmooth = 0;
+function smoothOpenness(raw){
+  openHist.push(raw);
+  if (openHist.length > 5) openHist.shift();
+  const sorted = [...openHist].sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  openSmooth = openSmooth + (med - openSmooth) * 0.38;
+  return openSmooth;
+}
+
+function detectLoop(){
+  let last = 0, frames = 0, fps = 0, fpsAt = performance.now();
+  let errText = '', errAt = 0;
+  let noHandSince = 0;
+  (function pump(){
+    requestAnimationFrame(pump);
+    if (!camOn || !handTracker) return;
+    if (video.readyState < 2 || !video.videoWidth){
+      dbgEl.textContent = '视频未就绪 readyState=' + video.readyState;
+      return;
+    }
+    const now = performance.now();
+    if (now - last < 33) return;
+    last = now;
+    let res;
+    try{
+      res = handTracker.detectForVideo(video, now);
+    }catch(err){
+      if (now - errAt > 1000){
+        errAt = now;
+        errText = '检测出错：' + ((err && err.message) || err);
+        console.warn('detectForVideo 出错', err);
+      }
+      dbgEl.textContent = errText;
+      return;
+    }
+    frames++;
+    if (now - fpsAt >= 1000){ fps = frames; frames = 0; fpsAt = now; }
+
+    const lm = res && res.landmarks && res.landmarks[0];
+    if (!lm){
+      if (cal.active){
+        drawOverlay(null, 0);
+        if (now - cal.lastHand > 4000) stopCal('校准中断：4 秒没识别到手，把手放进虚线框后重新校准', false);
+        else { setGesture('校准中 · 把手放进虚线框'); dbgEl.textContent = '校准中 hand:0  ' + video.videoWidth + 'x' + video.videoHeight + '  ' + fps + 'fps'; }
+        return;
+      }
+      if (!noHandSince) noHandSince = now;
+      if (now - noHandSince > 400) palmHist = [];
+      if (now - noHandSince > 1000) openHist = [];
+      drawOverlay(null, 0);
+      setGesture(now - noHandSince > 2000 ? '未检测到手 · 把手放进虚线框' : '寻找手…');
+      dbgEl.textContent = 'hand:0  ' + video.videoWidth + 'x' + video.videoHeight + '  ' + fps + 'fps';
+      return;
+    }
+    noHandSince = 0;
+    lastHandAt = now;
+
+    const raw0 = handOpenness(lm);
+    const raw = smoothOpenness(raw0);
+    const k = calibrate(raw);
+    if (cal.active){ cal.lastHand = now; calTick(raw0, now); }
+    const px = (lm[0].x + lm[9].x) / 2;
+    if (!cal.active) checkWave(px, now);
+    drawOverlay(lm, k);
+    dbgEl.textContent = cal.active
+      ? '校准 ' + (cal.phase === 'fist' ? '握拳' : '张开') + ' '
+        + Math.round(Math.min(CAL_MS, now - cal.t0) / CAL_MS * 100) + '%   r=' + raw0.toFixed(2)
+        + '\n' + fps + 'fps  手别动'
+      : 'hand:1  r=' + raw.toFixed(2) + '  k=' + k.toFixed(2)
+        + '\nlo=' + rLo.toFixed(2) + ' hi=' + rHi.toFixed(2) + '  ' + fps + 'fps';
+    if (!demoMode){
+      if (!cal.active) desired = k;
+      if (!holding && !cal.active) setGesture(k > 0.72 ? '张开' : k < 0.25 ? '握拳' : '半开');
+    }
+  })();
+}
+
+/* ============ 按钮 ============ */
+document.getElementById('btnCam').onclick = () => { if (!camOn) startCamera(); };
+document.getElementById('btnCal').onclick = () => {
+  if (cal.active) return;
+  if (!camOn){
+    calPending = true;
+    toast('正在开启摄像头，开启后自动开始校准');
+    startCamera();
+    return;
+  }
+  if (!handTracker){
+    calPending = modelState === 'loading';
+    toast(calPending ? '识别模型正在加载，就绪后自动开始校准' : '识别模型没启动成功，刷新页面后再试校准');
+    return;
+  }
+  startCal();
+};
+nameEl.style.pointerEvents = 'auto';
+nameEl.style.cursor = 'pointer';
+nameEl.title = '点一下换下一朵花';
+nameEl.onclick = () => switchFlower(1);
+
+document.getElementById('btnDemo').onclick = e => {
+  demoMode = !demoMode;
+  e.currentTarget.dataset.on = demoMode ? '1' : '0';
+  slider.classList.toggle('show', demoMode);
+  if (demoMode){
+    desired = parseFloat(slider.value);
+    setGesture('演示模式');
+    camHint.style.display = 'none';
+    toast('拖动滑块看花开 · 点花名换花');
+  }else{
+    setGesture(camOn ? '未检测到手' : '未开启');
+    if (!camOn) camHint.style.display = 'block';
+  }
+};
+slider.oninput = () => { if (demoMode){ desired = parseFloat(slider.value); holding = false; } };
+
+/* 全局 JS 报错直接显示在调试条，方便我们一起定位 */
+addEventListener('error', e => {
+  if (dbgEl) dbgEl.textContent = 'JS 错误: ' + (e.message || '');
+});
+
+/* 调试用：访问 index.html?autostart=1 会自动开摄像头（普通使用可忽略） */
+if (/[?&]autostart=1/.test(location.search)) setTimeout(startCamera, 400);
+</script>
+</body>
+</html>
